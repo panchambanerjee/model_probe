@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "Adversarial safety testing of LLMs"
 readme = "README.md"
 requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.0",
+]
 
 [project.optional-dependencies]
 dev = [

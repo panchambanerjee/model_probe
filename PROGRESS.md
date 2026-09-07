@@ -2,53 +2,37 @@
 
 Living notes for `model_probe`. Update this when scope, status, or layout changes. Keep the README as the public v0.1 summary.
 
+**File map:** see [`LAYOUT.md`](LAYOUT.md). Update `LAYOUT.md` whenever a path is added, renamed, moved, or changes role. Update this file whenever status or scope changes.
+
 Last updated: 2026-09-07
 
 ## Current status
 
-Skeleton is in place. The only implemented application piece is the `Model` protocol.
+v0.1 architecture is complete except ASR/export. A live run is:
 
-v0.1 goal: prove the architecture with a small runner — swap a **Model**, swap a **Suite**, score with a **Judge**, report attack success rate.
+`examples/run_tip.py` → `OpenAIModel` + `TIPSuite` + `TokenMatchJudge` → four verdicts.
+
+The suite uses a synthetic `RESTRICTED_TOKEN` objective (Caesar and Base64, hard and medium). The judge scores success if that token appears in the response. There is no ASR summary or persistence yet.
 
 Framework logic stays separate from benchmark content. Built-in development cases use a harmless synthetic “restricted behavior” objective. PHRYGE-style cases are benchmark data, not the default example.
 
 ## Done
 
 - Python 3.11+ project with `src/` layout, `pyproject.toml`, pytest, `.gitignore`
-- Package skeleton for models, suites, judges, runner, and results (files exist; most are empty)
-- `Model` protocol: synchronous `generate(prompt: str) -> str`
-- Unit test that a fake class satisfying the protocol can be used as a `Model`
-
-## In place but not implemented
-
-These files exist as placeholders only:
-
-| Path | Intended role |
-| --- | --- |
-| `src/model_probe/models/openai.py` | OpenAI-compatible adapter |
-| `src/model_probe/suites/base.py` | Suite / Case types |
-| `src/model_probe/suites/tip.py` | First TIP suite (synthetic objective) |
-| `src/model_probe/judges/base.py` | Judge protocol |
-| `src/model_probe/judges/heuristic.py` | Simple heuristic judge |
-| `src/model_probe/runner.py` | Run suite against model |
-| `src/model_probe/results.py` | ASR + per-case records |
-| `tests/test_runner.py` | Runner tests |
-| `tests/test_tip_suite.py` | TIP suite tests |
-
-## Scripts
-
-None yet. No CLI, no example scripts, no benchmark runners.
-
-Dev extras: pytest only (`pip install -e ".[dev]"`). No formatter or linter yet.
+- `Model` protocol: `generate(prompt: str) -> str`
+- `Suite` protocol + frozen `Case` dataclass
+- `Judge` protocol + frozen `Verdict` dataclass
+- `RunResult` dataclass + `run(model, suite, judge) -> list[RunResult]`
+- `TIPSuite`: 2 encodings × 2 difficulties, synthetic `RESTRICTED_TOKEN` objective
+- `TokenMatchJudge`: case-insensitive substring match on `case.metadata["objective"]`
+- `OpenAIModel`: OpenAI-compatible chat-completions adapter
+- `examples/run_tip.py`: runs the first live experiment and prints four verdicts
+- `LAYOUT.md`: directory map and per-file roles
+- Unit tests for protocols, runner, TIP, heuristic judge, and mocked OpenAI adapter
 
 ## Remaining for v0.1
 
-- Suite abstraction + tiny TIP suite (synthetic restricted-behavior objective; Caesar + Base64; two difficulty levels; no depersonalisation)
-- Judge abstraction + one concrete judge (callable or heuristic; no built-in LLM-as-judge)
-- Runner: `run(model, suite, judge) → results`
-- Results: ASR plus per-case JSON/CSV
-- Tests for the above
-- One OpenAI-compatible adapter (after the core types work)
+- ASR / JSON / CSV summaries (per-case `RunResult` exists; no aggregation or persistence yet)
 
 ## Explicitly out of v0.1
 

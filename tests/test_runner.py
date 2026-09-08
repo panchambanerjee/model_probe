@@ -45,3 +45,20 @@ def test_run_wires_model_suite_and_judge() -> None:
     assert results[1].response == "echo:say nothing"
     assert results[1].verdict.success is False
     assert results[1].metadata == {}
+
+
+def test_run_optional_callbacks() -> None:
+    started: list[str] = []
+    finished: list[str] = []
+
+    results = run(
+        FakeModel(),
+        FakeSuite(),
+        FakeJudge(),
+        on_case_start=lambda case: started.append(case.id),
+        on_result=lambda result: finished.append(result.case_id),
+    )
+
+    assert started == ["case-1", "case-2"]
+    assert finished == ["case-1", "case-2"]
+    assert [result.case_id for result in results] == ["case-1", "case-2"]

@@ -4,7 +4,7 @@ Map of the repository: what each directory is for, and what each file does.
 
 Update this file whenever you add, rename, move, or change the role of a path. Status, scope, and roadmap stay in `PROGRESS.md`.
 
-Last updated: 2026-09-07
+Last updated: 2026-09-08
 
 ## How a run flows
 
@@ -20,6 +20,7 @@ src/model_probe/runner.py          run(model, suite, judge)
                 │
                 ▼
         results.py                 list[RunResult]
+                                   summarize() → RunSummary (ASR)
 ```
 
 The runner does not know about TIP or OpenAI. It only sees the protocols in `models/base.py`, `suites/base.py`, and `judges/base.py`.
@@ -58,7 +59,8 @@ model_probe/
     ├── test_heuristic.py
     ├── test_runner.py
     ├── test_tip_suite.py
-    └── test_openai_model.py
+    ├── test_openai_model.py
+    └── test_results.py
 ```
 
 There is no `scripts/` directory and no console entry point. There is no `data/` or benchmark directory yet.
@@ -67,10 +69,10 @@ There is no `scripts/` directory and no console entry point. There is no `data/`
 
 | Path | What it does |
 | --- | --- |
-| `README.md` | Public v0.1 summary: what the package is, Model/Suite/Judge/Runner, synthetic vs benchmark split. |
+| `README.md` | Public v0.1 summary: what is implemented, install, `examples/run_tip.py`, tests, links to `PROGRESS.md` and `LAYOUT.md`. |
 | `PROGRESS.md` | Status, done, remaining, out of scope, long-term ideas. Not the file map. |
 | `LAYOUT.md` | This file. Directory map and per-file roles. |
-| `pyproject.toml` | Package `model-probe` 0.1.0, Python ≥3.11, runtime dep `openai>=1.0`, pytest as a `dev` extra. Hatchling build. Pytest collects `tests/` with `src/` on `pythonpath`. |
+| `pyproject.toml` | Package `model-probe` 0.1.0, Python ≥3.11, runtime dep `openai>=1.0`, pytest as a `dev` extra. Setuptools build with `src/` layout. Pytest collects `tests/` with `src/` on `pythonpath`. |
 | `.gitignore` | Bytecode, build artifacts, venvs, pytest caches, `.env`, editor files. |
 
 ## `src/model_probe/`
@@ -80,8 +82,8 @@ The installable library. Callers import from here.
 | Path | What it does |
 | --- | --- |
 | `__init__.py` | Empty package marker. No public re-exports yet. |
-| `runner.py` | `run(model, suite, judge)`: for each case, generate, judge, append a `RunResult`. Sequential. No retries, logging, async, or error wrapping. |
-| `results.py` | Frozen `RunResult`: `case_id`, `prompt`, `response`, `verdict`, `metadata`. One record per case. No ASR helper, no JSON/CSV export. |
+| `runner.py` | `run(model, suite, judge)`: for each case, generate, judge, append a `RunResult`. Optional `on_case_start(case)` before generate and `on_result(result)` after. Sequential. No retries, logging, async, or error wrapping. |
+| `results.py` | Frozen `RunResult` (`case_id`, `prompt`, `response`, `verdict`, `metadata`). Frozen `RunSummary` (`total`, `successes`, `attack_success_rate`). `summarize(results)` is successes / total, or 0.0 if empty. No grouping, no JSON/CSV export. |
 
 ### `src/model_probe/models/`
 
@@ -119,7 +121,7 @@ Runnable demos. Not part of the installed API. Not a CLI.
 
 | Path | What it does |
 | --- | --- |
-| `run_tip.py` | First live experiment. Requires `OPENAI_API_KEY`. Optional `OPENAI_MODEL` (default `gpt-4o-mini`) and `OPENAI_BASE_URL`. Runs `run(OpenAIModel(...), TIPSuite(), TokenMatchJudge())` and prints four lines: `case_id`, `success`, `reason`. Does not print the key, prompts, or responses. Exits 1 if the key is missing. |
+| `run_tip.py` | First live experiment. Puts repo `src/` on `sys.path` so it runs without a working editable install. Requires `OPENAI_API_KEY`. Optional `OPENAI_MODEL` (default `gpt-4o-mini`) and `OPENAI_BASE_URL`. Prints `[i/n] case_id ...` before each model call, then the verdict and a 160-character response snippet. Then prints ASR summary. Does not print the key or full prompts. Exits 1 if the key is missing. |
 
 ```bash
 pip install -e ".[dev]"
@@ -136,9 +138,10 @@ Pytest suite. Fakes satisfy protocols; the OpenAI adapter is mocked and never ca
 | `test_suites.py` | `FakeSuite` with two cases. Checks name, ids, prompts, metadata. |
 | `test_judges.py` | `FakeJudge` succeeds if the response contains `"RESTRICTED"`. |
 | `test_heuristic.py` | `TokenMatchJudge`: match, case-insensitive match, no match, missing objective. |
-| `test_runner.py` | Fake model + suite + judge through `run()`. Checks order, echo, metadata, one hit and one miss. |
+| `test_runner.py` | Fake model + suite + judge through `run()`. Checks order, echo, metadata, one hit and one miss, and optional start/result callbacks. |
 | `test_tip_suite.py` | `TIPSuite` has 4 cases, correct metadata, independently computed Caesar/Base64 payloads, raw token absent from prompts. |
 | `test_openai_model.py` | Mocks `OpenAI`. Checks returned text, empty content, empty choices, `base_url` passed or omitted. |
+| `test_results.py` | `summarize()`: mixed 3/4 → ASR 0.75, all successes → 1.0, empty list → 0.0. |
 
 ```bash
 pip install -e ".[dev]"

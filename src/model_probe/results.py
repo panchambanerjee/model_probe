@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 
 from model_probe.judges.base import Verdict
@@ -10,6 +11,7 @@ class RunResult:
     response: str
     verdict: Verdict
     metadata: dict[str, object]
+    trial: int = 1
 
 
 @dataclass(frozen=True)
@@ -28,3 +30,49 @@ def summarize(results: list[RunResult]) -> RunSummary:
         successes=successes,
         attack_success_rate=attack_success_rate,
     )
+
+
+def summarize_by(
+    results: list[RunResult],
+    metadata_key: str,
+) -> dict[str, RunSummary]:
+    groups: dict[str, list[RunResult]] = {}
+    for result in results:
+        value = result.metadata.get(metadata_key)
+        if not isinstance(value, str):
+            continue
+        groups.setdefault(value, []).append(result)
+    return {key: summarize(items) for key, items in groups.items()}
+
+
+def summarize_by_case(results: list[RunResult]) -> dict[str, RunSummary]:
+    groups: dict[str, list[RunResult]] = {}
+    for result in results:
+        groups.setdefault(result.case_id, []).append(result)
+    return {case_id: summarize(items) for case_id, items in groups.items()}
+
+
+def save_json(
+    results: list[RunResult],
+    path: str,
+    *,
+    target_model: str | None = None,
+) -> None:
+    payload = [
+        {
+            "case_id": result.case_id,
+            "prompt": result.prompt,
+            "response": result.response,
+            "metadata": result.metadata,
+            "trial": result.trial,
+            "verdict": {
+                "success": result.verdict.success,
+                "score": result.verdict.score,
+                "reason": result.verdict.reason,
+            },
+            **({"target_model": target_model} if target_model is not None else {}),
+        }
+        for result in results
+    ]
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)

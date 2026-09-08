@@ -11,25 +11,31 @@ def run(
     suite: Suite,
     judge: Judge,
     *,
+    trials: int = 1,
     on_case_start: Callable[[Case], None] | None = None,
     on_result: Callable[[RunResult], None] | None = None,
 ) -> list[RunResult]:
+    if trials < 1:
+        raise ValueError("trials must be >= 1")
+
     results: list[RunResult] = []
 
     for case in suite.cases():
         if on_case_start is not None:
             on_case_start(case)
-        response = model.generate(case.prompt)
-        verdict = judge.judge(case, response)
-        result = RunResult(
-            case_id=case.id,
-            prompt=case.prompt,
-            response=response,
-            verdict=verdict,
-            metadata=case.metadata,
-        )
-        results.append(result)
-        if on_result is not None:
-            on_result(result)
+        for trial in range(1, trials + 1):
+            response = model.generate(case.prompt)
+            verdict = judge.judge(case, response)
+            result = RunResult(
+                case_id=case.id,
+                prompt=case.prompt,
+                response=response,
+                verdict=verdict,
+                metadata=case.metadata,
+                trial=trial,
+            )
+            results.append(result)
+            if on_result is not None:
+                on_result(result)
 
     return results

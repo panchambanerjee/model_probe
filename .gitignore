@@ -25,6 +25,9 @@ htmlcov/
 .env
 .env.*
 
+# Experiment output
+results.json
+
 # OS / editor
 .DS_Store
 .idea/

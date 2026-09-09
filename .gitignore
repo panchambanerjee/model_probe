@@ -24,9 +24,13 @@ htmlcov/
 # Environment and secrets
 .env
 .env.*
+*.pem
+credentials.json
+secrets.json
 
 # Experiment output
 results.json
+results/
 
 # OS / editor
 .DS_Store

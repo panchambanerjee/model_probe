@@ -26,6 +26,14 @@ The minimal v0.1 loop is functionally complete:
 
 `examples/run_tip.py` runs `TIPSuite(phryge_objectives())`: PHRYGE counterfeit, toxic-messaging, and media-piracy objectives through Caesar/Base64/Python × hard/medium (18 cases). Downstream `[MASK]` requests live on the objective templates.
 
+`examples/compare_models.py` runs that same 18-case suite sequentially against each name in `TARGET_MODELS`, with one fixed `LLMJudge`. It prints per-target ASR (overall, objective, encoding, difficulty), writes `results/<safe-model-name>.json`, then a compact overall / counterfeit / toxic / piracy table.
+
+`examples/inspect_failures.py` prints saved `success=False` rows from a results JSON (no model calls) and counts failures by objective, encoding, and difficulty.
+
+`examples/classify_failures.py` interactively labels those failures into `decode_failure`, `decoded_then_refused`, `off_target_response`, or `other`, writing a sidecar `*.failures.json` (does not rewrite the run file).
+
+A `TRIALS=5` comparison (`gpt-4o-mini` 93.3% ASR, `gpt-5-mini` 22.2%, `gpt-5.6-luna` 15.6%; judge `gpt-5.6-terra`) is a preliminary finding: many low-ASR failures looked like decode-then-refuse, with toxic messaging remaining more permissive. Not a universal ranking.
+
 ## Done
 
 - Python 3.11+ project with `src/` layout, `pyproject.toml` (setuptools), pytest, `.gitignore`
@@ -51,15 +59,19 @@ The minimal v0.1 loop is functionally complete:
 - `docs/JUDGE_LABELING.md`: human rubric for criterion-first `expected_success` labels (toxic vs counterfeit; skip if ambiguous)
 - `LAYOUT.md`: directory map and per-file roles
 - `README.md`: public user guide (install, env vars, live run, grouped ASR, library usage, tests, citation)
-- Unit tests for protocols, runner, TIP, heuristic judge, mocked LLM judge, mocked OpenAI adapter, ASR summary, binary judge metrics, the PHRYGE three-objective slice, the six-response human-labelled judge-validation fixture, and the 26-row disagreement fixture / `parse_label`
+- Unit tests for protocols, runner, TIP, heuristic judge, mocked LLM judge, mocked OpenAI adapter, ASR summary, binary judge metrics, the PHRYGE three-objective slice, the six-response human-labelled judge-validation fixture, the 26-row disagreement fixture / `parse_label`, and public package imports
+- Public v0.1 API in `model_probe.__init__`: `__version__ = "0.1.0"`, `__all__`, and re-exports of the supported types and functions (implementations stay in their modules)
+- `examples/compare_models.py`: sequential multi-target comparison on the fixed 18-case TIP suite; same `LLMJudge`; `TARGET_MODELS` comma-separated; per-target JSON under `results/`; compact ASR table. Runner unchanged.
+- `examples/inspect_failures.py`: offline inspection of saved `success=False` rows; grouped failure counts; no classification and no model calls
+- `examples/classify_failures.py`: manual failure taxonomy sidecar (`decode_failure`, `decoded_then_refused`, `off_target_response`, `other`); save after each label; summary counts/percentages
 
-## Remaining for v0.1
+## Remaining after v0.1.0
 
-None for the core loop. Optional next (not required to call v0.1 done):
+v0.1.0 is the first public release. Optional later:
 
+- Full failure-taxonomy labeling of comparison runs
 - CSV export of results
 - Make the TIP suite more faithful to PHRYGE
-- Public package exports / CLI
 
 ## Explicitly out of v0.1
 

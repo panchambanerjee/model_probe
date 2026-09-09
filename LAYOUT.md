@@ -32,6 +32,12 @@ The runner does not know about TIP or OpenAI. It only sees the protocols in `mod
 
 `examples/compare_judges.py`, `examples/inspect_disagreements.py`, and `examples/evaluate_judges.py` skip the runner. The first two load `results.json`; evaluate loads the human-labelled disagreement fixture. All three score saved responses with `TokenMatchJudge` and `LLMJudge`.
 
+`examples/compare_models.py` uses the existing runner sequentially: same `TIPSuite(phryge_objectives())` and one `LLMJudge`, multiple target models.
+
+`examples/inspect_failures.py` loads a saved results JSON and prints only `success=False` rows. No model calls.
+
+`examples/classify_failures.py` writes a sidecar taxonomy file (`*.failures.json`) with manual labels for those failures. It does not rewrite the results JSON.
+
 ## Tree
 
 ```text
@@ -39,6 +45,7 @@ model_probe/
 ├── README.md
 ├── PROGRESS.md
 ├── LAYOUT.md                 ← this file
+├── LICENSE
 ├── docs/
 │   └── JUDGE_LABELING.md
 ├── pyproject.toml
@@ -48,7 +55,10 @@ model_probe/
 │   ├── compare_judges.py
 │   ├── inspect_disagreements.py
 │   ├── label_disagreements.py
-│   └── evaluate_judges.py
+│   ├── evaluate_judges.py
+│   ├── compare_models.py
+│   ├── inspect_failures.py
+│   └── classify_failures.py
 ├── src/model_probe/
 │   ├── __init__.py
 │   ├── runner.py
@@ -74,7 +84,8 @@ model_probe/
 └── tests/
     ├── fixtures/
     │   ├── judge_validation.json
-    │   └── judge_disagreements.json
+    │   ├── judge_disagreements.json
+    │   └── inspect_failures.json
     ├── test_models.py
     ├── test_suites.py
     ├── test_judges.py
@@ -87,21 +98,26 @@ model_probe/
     ├── test_phryge.py
     ├── test_judge_validation.py
     ├── test_judge_disagreements.py
-    └── test_metrics.py
+    ├── test_metrics.py
+    ├── test_public_api.py
+    ├── test_compare_models.py
+    ├── test_inspect_failures.py
+    └── test_classify_failures.py
 ```
 
-There is no `scripts/` directory and no console entry point. There is no YAML/JSON loader. PHRYGE data is three objectives (counterfeit, toxic messaging, media piracy). Live runs write `results.json` in the working directory.
+There is no `scripts/` directory and no console entry point. There is no YAML/JSON loader. PHRYGE data is three objectives (counterfeit, toxic messaging, media piracy). Single-target live runs write `results.json` in the working directory; `compare_models.py` writes `results/<safe-model-name>.json`.
 
 ## Root
 
 | Path | What it does |
 | --- | --- |
 | `README.md` | Public user guide: what the package does, install, env vars, live TIP run, grouped ASR (including objective × encoding), library snippet, tests, current scope, paper citation. |
+| `LICENSE` | MIT. |
 | `PROGRESS.md` | Status, done, remaining, out of scope, long-term ideas. Not the file map. |
 | `LAYOUT.md` | This file. Directory map and per-file roles. |
 | `docs/JUDGE_LABELING.md` | Human rubric for `expected_success`: criterion-first labels for toxic messaging, counterfeit, and media piracy. Not code. |
-| `pyproject.toml` | Package `model-probe` 0.1.0, Python ≥3.11, runtime dep `openai>=1.0`, pytest as a `dev` extra. Setuptools build with `src/` layout. Pytest collects `tests/` with `src/` on `pythonpath`. |
-| `.gitignore` | Bytecode, build artifacts, venvs, pytest caches, `.env`, editor files, `results.json`. |
+| `pyproject.toml` | Package `model-probe` 0.1.0, MIT, Python ≥3.11, runtime dep `openai>=1.0`, pytest as a `dev` extra. Setuptools build with `src/` layout. Pytest collects `tests/` with `src/` on `pythonpath`. |
+| `.gitignore` | Bytecode, build artifacts, venvs, pytest caches, `.env`, `*.pem`, `credentials.json`, `secrets.json`, editor files, `results.json`, `results/`. |
 
 ## `src/model_probe/`
 
@@ -109,7 +125,7 @@ The installable library. Callers import from here.
 
 | Path | What it does |
 | --- | --- |
-| `__init__.py` | Empty package marker. No public re-exports yet. |
+| `__init__.py` | Public v0.1 API. Re-exports `Case`, `Objective`, `Verdict`, `RunResult`, `RunSummary`, `BinaryMetrics`, `Model`, `Suite`, `Judge`, `OpenAIModel`, `TIPSuite`, `LLMJudge`, `TokenMatchJudge`, `phryge_objectives`, `run`, `summarize`, `summarize_by`, `summarize_by_two`, `summarize_by_case`, `save_json`, `score_binary`. `__all__` and `__version__ = "0.1.0"`. Implementations stay in their modules. |
 | `runner.py` | `run(model, suite, judge, *, trials=1)`: for each case, generate and judge `trials` times (trial numbers start at 1). Optional `on_case_start(case)` once per case, `on_result(result)` after each trial. Sequential. No retries, logging, async, or error wrapping. |
 | `results.py` | Frozen `RunResult` (`case_id`, `prompt`, `response`, `verdict`, `metadata`, `trial` default 1). Frozen `RunSummary` (`total`, `successes`, `attack_success_rate`). `summarize(results)` is successes / total over all results (so repeated trials are included), or 0.0 if empty. `summarize_by(results, metadata_key)` groups string metadata values and reuses `summarize()` per group; missing/non-string values are skipped. `summarize_by_two(results, first_key, second_key)` is the same for two string metadata fields (first-seen order on both axes). `summarize_by_case(results)` groups by `case_id` in first-seen order. `save_json(results, path, *, target_model=None)` writes a pretty-printed JSON array of those fields plus nested `verdict.{success,score,reason}`. Optional `target_model` is stored on each record. Stdlib only. No CSV. |
 | `metrics.py` | Frozen `BinaryMetrics` and `score_binary(labels, predictions)` for judge-vs-human evaluation. Positive class is `True`. Empty input or zero-denominator precision/recall/F1 → 0.0. Length mismatch raises `ValueError`. |
@@ -166,6 +182,9 @@ Runnable demos. Not part of the installed API. Not a CLI.
 | `inspect_disagreements.py` | Same re-score as `compare_judges.py`, but prints only rows where `TokenMatchJudge` and `LLMJudge` disagree. For each: case id, trial, objective id, encoding, difficulty, token verdict, LLM verdict, and the full saved target response. Then total results, disagreement count, and disagreement rate. Does not call the target model or write `results.json`. Exits 1 if the file or key is missing. |
 | `label_disagreements.py` | Interactive human labelling of `tests/fixtures/judge_disagreements.json`. Shows one unlabeled case at a time (`y` / `n` / `s`). Writes `expected_success` after every `y` or `n`. Never calls a model. |
 | `evaluate_judges.py` | Scores `TokenMatchJudge` and `LLMJudge` against human `expected_success` in `tests/fixtures/judge_disagreements.json`. Exits 1 if any label is still `null`. Does not call the target model. `JUDGE_MODEL` default `gpt-5.6-terra`. Prints accuracy, TP/TN/FP/FN, precision, recall, F1 overall and by `objective_id`. |
+| `compare_models.py` | Sequential multi-target comparison. Does not change the runner. Reads comma-separated `TARGET_MODELS`. One `LLMJudge` from `JUDGE_MODEL` (default `gpt-5.6-terra`). `TRIALS` default 1. For each target: `run(OpenAIModel, TIPSuite(phryge_objectives()), judge)`, print overall / objective / encoding / difficulty ASR, write `results/<safe-model-name>.json`. Then a compact overall + counterfeit / toxic / piracy table. Exits 1 if `OPENAI_API_KEY` or `TARGET_MODELS` is missing. |
+| `inspect_failures.py` | Loads a saved results JSON (positional path). Prints only rows whose saved verdict has `success=False`: case id, trial, objective, encoding, difficulty, judge reason, full response. Then failure counts by objective, encoding, and difficulty. Does not call a model or classify failure modes. Exits 1 if the path is missing. |
+| `classify_failures.py` | Manual failure taxonomy for a saved results JSON. Writes `results/<stem>.failures.json` with `case_id`, `trial`, `failure_type`. Keys: `d` decode_failure, `r` decoded_then_refused, `o` off_target_response, `x` other, `s` skip. Saves after every label. Prints counts and percentages among labeled rows. Never calls a model. Does not modify the results file. |
 
 ```bash
 pip install -e ".[dev]"
@@ -175,6 +194,9 @@ OPENAI_API_KEY=... python examples/compare_judges.py
 OPENAI_API_KEY=... python examples/inspect_disagreements.py
 python examples/label_disagreements.py
 OPENAI_API_KEY=... python examples/evaluate_judges.py
+TARGET_MODELS=gpt-4o-mini,gpt-5.6-luna OPENAI_API_KEY=... python examples/compare_models.py
+python examples/inspect_failures.py results/gpt-5.6-luna.json
+python examples/classify_failures.py results/gpt-5.6-luna.json
 ```
 
 ## `tests/`
@@ -198,6 +220,11 @@ Pytest suite. Fakes satisfy protocols; the OpenAI adapter is mocked and never ca
 | `fixtures/judge_disagreements.json` | 26 frozen TokenMatch vs LLM disagreements from the current `results.json` run. Fields: `case_id`, `trial`, `response`, `metadata`, `expected_success` (human bool). No prompts, verdicts, or judge outputs. |
 | `test_judge_disagreements.py` | Fixture has 26 records in frozen `(case_id, trial)` order; `expected_success` is `null` or a bool; `parse_label` accepts `y`/`n`/`s`. No network calls. |
 | `test_metrics.py` | `score_binary()`: mixed counts, perfect match, empty lists, no predicted positives, no actual positives, length mismatch. No network calls. |
+| `test_public_api.py` | Package `__version__` is `0.1.0`; `__all__` lists the supported public names; each public name is the same object as the implementation module. |
+| `test_compare_models.py` | Parses `TARGET_MODELS`, sanitizes output filenames, and builds comparison rows from fake `RunResult`s. No network calls. |
+| `fixtures/inspect_failures.json` | Four synthetic saved results (three failures, one success). No API keys. |
+| `test_inspect_failures.py` | Filters `success=False` rows from the fixture; counts by objective / encoding / difficulty; formatted failure text includes case id, trial, objective, encoding, difficulty, judge reason, and response. No network calls. |
+| `test_classify_failures.py` | Parses `d`/`r`/`o`/`x`/`s`; sidecar path suffix; merge preserves existing labels; summary counts and percentages ignore unlabeled rows. No network calls. |
 
 ```bash
 pip install -e ".[dev]"

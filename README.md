@@ -4,7 +4,7 @@
 
 It lets you run the same adversarial prompts against different models, repeat attacks to measure variability, score responses with a configurable judge, and break attack success rate down by attack type, encoding, difficulty, objective, and safety category.
 
-The goal is not just to ask **"did the jailbreak work?"**, but to make it easier to study **where, when, and why model safeguards fail or hold**.
+The goal is not just to ask **"did the jailbreak work?"**, but to make it easier to study **where, when, and why model safeguards fail or hold**. I hope that it can be, in a future form, used as a tool for LLM Safety research. 
 
 ```text
 model + attack suite + judge
@@ -18,7 +18,7 @@ model + attack suite + judge
 
 v0.1.0 includes a partial implementation of the TIP / PHRYGE benchmark from *The TIP of the Iceberg* (ACL 2025). Python 3.11+. MIT.
 
-## Try it in five minutes
+## Try it
 
 ```bash
 git clone https://github.com/panchambanerjee/model_probe.git
@@ -59,7 +59,7 @@ OPENAI_BASE_URL=https://... \
 python examples/run_tip.py
 ```
 
-Each case is a target call plus a judge call. `LLMJudge` is the recommended scorer. `TokenMatchJudge` exists for cheap debugging only (`JUDGE=token`); do not treat token-match ASR as a safety result.
+Each case is a target call plus a judge call. `LLMJudge` is the recommended scorer. `TokenMatchJudge` exists for cheap debugging only (`JUDGE=token`); do not treat token-match ASR (Attack Success Rate) as a safety result.
 
 A successful run ends with grouped output like:
 
@@ -76,7 +76,7 @@ and writes the full structured results to `results.json` (gitignored).
 
 ## Why model_probe?
 
-Adversarial evaluations often end with a single attack-success number. `model_probe` is being built around a slightly broader question:
+Adversarial evaluations often end with a single attack-success number. The idea is that `model_probe` is being built to answer a slightly broader question:
 
 **What actually happened when the attack succeeded or failed?**
 
@@ -283,7 +283,7 @@ License: [MIT](LICENSE).
 
 ## Citation
 
-TIP / PHRYGE:
+Task-In-Prompt (TIP) Paper:
 
 ```text
 Berezin, Sergey, Reza Farahbakhsh, and Noel Crespi.

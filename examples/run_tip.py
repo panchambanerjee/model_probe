@@ -8,6 +8,7 @@ if str(_SRC) not in sys.path:
 
 from model_probe.benchmarks.phryge import phryge_objectives
 from model_probe.judges.heuristic import TokenMatchJudge
+from model_probe.judges.llm import LLMJudge
 from model_probe.models.openai import OpenAIModel
 from model_probe.results import (
     RunResult,
@@ -16,6 +17,7 @@ from model_probe.results import (
     summarize,
     summarize_by,
     summarize_by_case,
+    summarize_by_two,
 )
 from model_probe.runner import run
 from model_probe.suites.base import Case
@@ -38,6 +40,18 @@ def _print_groups(title: str, grouped: dict[str, RunSummary]) -> None:
         _print_asr(f"  {key}", summary)
 
 
+def _print_cross(
+    title: str,
+    grouped: dict[str, dict[str, RunSummary]],
+) -> None:
+    print()
+    print(title)
+    for first, inner in grouped.items():
+        print(f"  {first}")
+        for second, summary in inner.items():
+            _print_asr(f"    {second}", summary)
+
+
 def _snippet(text: str) -> str:
     compact = " ".join(text.split())
     if not compact:
@@ -45,6 +59,25 @@ def _snippet(text: str) -> str:
     if len(compact) > _SNIPPET_CHARS:
         return compact[: _SNIPPET_CHARS - 3] + "..."
     return compact
+
+
+def _build_judge(api_key: str, base_url: str | None):
+    kind = os.environ.get("JUDGE", "llm").strip().lower()
+    if kind == "token":
+        return "TokenMatchJudge", TokenMatchJudge()
+    if kind == "llm":
+        judge_model = os.environ.get("JUDGE_MODEL", "gpt-5.6-terra")
+        return (
+            f"LLMJudge ({judge_model})",
+            LLMJudge(
+                OpenAIModel(model=judge_model, api_key=api_key, base_url=base_url)
+            ),
+        )
+    print(
+        f"Unknown JUDGE={kind!r}. Use llm (default) or token.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def main() -> None:
@@ -56,7 +89,9 @@ def main() -> None:
     model_name = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
     base_url = os.environ.get("OPENAI_BASE_URL") or None
     trials = int(os.environ.get("TRIALS", "1"))
+    judge_label, judge = _build_judge(api_key, base_url)
     print(f"Target model: {model_name}", flush=True)
+    print(f"Judge: {judge_label}", flush=True)
     print(f"Trials: {trials}", flush=True)
     print(flush=True)
     suite = TIPSuite(phryge_objectives())
@@ -75,7 +110,7 @@ def main() -> None:
     results = run(
         OpenAIModel(model=model_name, api_key=api_key, base_url=base_url),
         suite,
-        TokenMatchJudge(),
+        judge,
         trials=trials,
         on_case_start=on_case_start,
         on_result=on_result,
@@ -87,6 +122,16 @@ def main() -> None:
     _print_asr("Overall ASR", summary)
     _print_groups("By encoding", summarize_by(results, "encoding"))
     _print_groups("By difficulty", summarize_by(results, "difficulty"))
+    _print_groups("By objective", summarize_by(results, "objective_id"))
+    _print_groups("By category", summarize_by(results, "category"))
+    _print_cross(
+        "By objective × encoding",
+        summarize_by_two(results, "objective_id", "encoding"),
+    )
+    _print_cross(
+        "By objective × difficulty",
+        summarize_by_two(results, "objective_id", "difficulty"),
+    )
     _print_groups("By case", summarize_by_case(results))
 
     output_path = "results.json"

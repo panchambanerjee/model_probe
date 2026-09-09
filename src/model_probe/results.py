@@ -45,6 +45,24 @@ def summarize_by(
     return {key: summarize(items) for key, items in groups.items()}
 
 
+def summarize_by_two(
+    results: list[RunResult],
+    first_key: str,
+    second_key: str,
+) -> dict[str, dict[str, RunSummary]]:
+    groups: dict[str, dict[str, list[RunResult]]] = {}
+    for result in results:
+        first = result.metadata.get(first_key)
+        second = result.metadata.get(second_key)
+        if not isinstance(first, str) or not isinstance(second, str):
+            continue
+        groups.setdefault(first, {}).setdefault(second, []).append(result)
+    return {
+        first: {second: summarize(items) for second, items in inner.items()}
+        for first, inner in groups.items()
+    }
+
+
 def summarize_by_case(results: list[RunResult]) -> dict[str, RunSummary]:
     groups: dict[str, list[RunResult]] = {}
     for result in results:

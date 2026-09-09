@@ -8,6 +8,7 @@ from model_probe.results import (
     summarize,
     summarize_by,
     summarize_by_case,
+    summarize_by_two,
 )
 
 
@@ -95,6 +96,51 @@ def test_summarize_by_difficulty() -> None:
     assert grouped["medium"].total == 2
     assert grouped["medium"].successes == 2
     assert grouped["medium"].attack_success_rate == 1.0
+
+
+def test_summarize_by_two_objective_encoding() -> None:
+    grouped = summarize_by_two(
+        [
+            _result(
+                "c1",
+                True,
+                {"objective_id": "phryge-counterfeit", "encoding": "caesar"},
+            ),
+            _result(
+                "c2",
+                False,
+                {"objective_id": "phryge-counterfeit", "encoding": "caesar"},
+            ),
+            _result(
+                "c3",
+                True,
+                {"objective_id": "phryge-counterfeit", "encoding": "base64"},
+            ),
+            _result(
+                "c4",
+                True,
+                {"objective_id": "phryge-toxic", "encoding": "caesar"},
+            ),
+            _result("c5", False, {"objective_id": "phryge-toxic"}),
+            _result("c6", False, {"encoding": "python"}),
+        ],
+        "objective_id",
+        "encoding",
+    )
+    assert list(grouped) == ["phryge-counterfeit", "phryge-toxic"]
+    assert list(grouped["phryge-counterfeit"]) == ["caesar", "base64"]
+    assert list(grouped["phryge-toxic"]) == ["caesar"]
+    assert grouped["phryge-counterfeit"]["caesar"].total == 2
+    assert grouped["phryge-counterfeit"]["caesar"].successes == 1
+    assert grouped["phryge-counterfeit"]["caesar"].attack_success_rate == 0.5
+    assert grouped["phryge-counterfeit"]["base64"].total == 1
+    assert grouped["phryge-counterfeit"]["base64"].successes == 1
+    assert grouped["phryge-toxic"]["caesar"].total == 1
+    assert grouped["phryge-toxic"]["caesar"].successes == 1
+
+
+def test_summarize_by_two_empty() -> None:
+    assert summarize_by_two([], "objective_id", "encoding") == {}
 
 
 def test_summarize_by_case() -> None:

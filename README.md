@@ -314,7 +314,7 @@ License: [MIT](LICENSE).
 
 Not included yet: the full PHRYGE benchmark (10 encodings, 4 objectives, 3 difficulties), a self-harm objective, extra model providers, CLI, CSV export, or defenses.
 
-File map: [LAYOUT.md](LAYOUT.md). Status and roadmap: [PROGRESS.md](PROGRESS.md). Judge labels: [docs/JUDGE_LABELING.md](docs/JUDGE_LABELING.md).
+File map and roadmap are local working notes, not in the public tree. Judge labels: [docs/JUDGE_LABELING.md](docs/JUDGE_LABELING.md).
 
 ## Citation
 

@@ -32,6 +32,10 @@ secrets.json
 results.json
 results/
 
+# Local working notes (not part of the public repo)
+LAYOUT.md
+PROGRESS.md
+
 # OS / editor
 .DS_Store
 .idea/
